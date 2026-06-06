@@ -608,8 +608,33 @@
   let intervalId = null;
   let totalStartTime = null;
   let phaseStartTime = null;
+  let notificationPermission = 'default';
 
   const $ = id => document.getElementById(id);
+
+  async function requestNotificationPermission() {
+    if ('Notification' in window && Notification.permission === 'default') {
+      notificationPermission = await Notification.requestPermission();
+    } else if ('Notification' in window) {
+      notificationPermission = Notification.permission;
+    }
+  }
+
+  function sendNotification(title, body) {
+    if (document.hidden && notificationPermission === 'granted') {
+      const notification = new Notification(title, {
+        body: body,
+        icon: '🍚',
+        tag: 'hanngo-timer',
+        requireInteraction: true
+      });
+      
+      notification.onclick = () => {
+        window.focus();
+        notification.close();
+      };
+    }
+  }
 
   document.querySelectorAll('.checklist li').forEach(li => {
     li.addEventListener('click', () => {
@@ -664,7 +689,8 @@
     $(id).classList.add('active');
   }
 
-  function goToTimer() {
+  async function goToTimer() {
+    await requestNotificationPermission();
     showScreen('screen-timer');
     totalStartTime = Date.now();
     currentPhaseIndex = 0;
@@ -752,6 +778,7 @@
     $('message-bubble').innerHTML = phase.msgDone;
     $('timer-time').classList.remove('pulsing');
 
+    sendNotification('飯盒タイマー', `${phase.label}が完了しました！`);
     playBeep();
     vibrate();
 
@@ -801,6 +828,7 @@
       el.classList.add('done');
     });
 
+    sendNotification('飯盒タイマー', '炊き上がりました！🍚');
     playFanfare();
     vibrate();
     setTimeout(() => showScreen('screen-done'), 600);
