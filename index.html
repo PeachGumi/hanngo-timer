@@ -607,6 +607,7 @@
   let phaseDuration = 0;
   let intervalId = null;
   let totalStartTime = null;
+  let phaseStartTime = null;
 
   const $ = id => document.getElementById(id);
 
@@ -709,6 +710,7 @@
     $('timer-tap-hint').textContent = '';
     $('message-bubble').innerHTML = phase.msgRunning;
 
+    phaseStartTime = Date.now();
     updateDisplay();
     clearInterval(intervalId);
     intervalId = setInterval(tick, 250);
@@ -722,9 +724,10 @@
   }
 
   function tick() {
-    phaseTimeLeft -= 0.25;
+    const elapsed = (Date.now() - phaseStartTime) / 1000;
+    phaseTimeLeft = Math.max(0, phaseDuration - elapsed);
+    
     if (phaseTimeLeft <= 0) {
-      phaseTimeLeft = 0;
       updateDisplay();
       clearInterval(intervalId);
       phaseComplete();
@@ -732,6 +735,12 @@
     }
     updateDisplay();
   }
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && phaseState === 'running') {
+      tick();
+    }
+  });
 
   function phaseComplete() {
     phaseState = 'done';
@@ -804,6 +813,7 @@
     phaseTimeLeft = 0;
     phaseDuration = 0;
     totalStartTime = null;
+    phaseStartTime = null;
     checks = { wash: false, water: false, lid: false, fire: false };
     document.querySelectorAll('.checklist li').forEach(li => li.classList.remove('checked'));
     updateStartButton();
