@@ -442,6 +442,15 @@
     color: var(--text-dim);
   }
 
+  .version {
+    position: fixed;
+    bottom: 8px;
+    right: 8px;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    opacity: 0.5;
+  }
+
   .settings-delete {
     width: 28px;
     height: 28px;
@@ -961,5 +970,6 @@
     if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
   }
 </script>
+<div class="version">v1.0.3</div>
 </body>
 </html>
