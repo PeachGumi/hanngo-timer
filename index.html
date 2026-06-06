@@ -596,7 +596,7 @@
   };
 
   const PHASE_ORDER = ['soak', 'high', 'low', 'steam'];
-  let durations = { soak: 5/60, high: 5/60, low: 5/60, steam: 5/60 };
+  let durations = { soak: 30, high: 5, low: 10, steam: 15 };
   let disabledPhases = new Set();
   let checks = { wash: false, water: false, lid: false, fire: false };
 
