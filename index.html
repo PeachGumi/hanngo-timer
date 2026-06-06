@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>飯盒タイマー</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #1a1a2e;
+    --card: #16213e;
+    --accent: #e2a24d;
+    --accent-glow: #f0b960;
+    --text: #eee;
+    --text-dim: #8899aa;
+    --danger: #e74c3c;
+    --success: #2ecc71;
+    --phase-soak: #3498db;
+    --phase-boil-high: #e74c3c;
+    --phase-boil-low: #e67e22;
+    --phase-steam: #9b59b6;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'Hiragino Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    user-select: none;
+  }
+
+  h1 {
+    font-size: 1.6rem;
+    margin: 20px 0 8px;
+    letter-spacing: 0.05em;
+  }
+
+  h1 span { color: var(--accent); }
+
+  .subtitle {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    margin-bottom: 24px;
+  }
+
+  .screen { display: none; width: 100%; max-width: 400px; }
+  .screen.active { display: flex; flex-direction: column; align-items: center; }
+
+  .prep-card {
+    background: var(--card);
+    border-radius: 16px;
+    padding: 24px;
+    width: 100%;
+    margin-bottom: 16px;
+  }
+
+  .prep-card h2 {
+    font-size: 1rem;
+    color: var(--accent);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .checklist { list-style: none; }
+
+  .checklist li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+
+  .checklist li:last-child { border-bottom: none; }
+  .checklist li.checked { opacity: 0.4; text-decoration: line-through; }
+
+  .check-box {
+    width: 24px;
+    height: 24px;
+    border: 2px solid var(--text-dim);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.2s;
+  }
+
+  .checklist li.checked .check-box {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .check-box svg {
+    width: 14px;
+    height: 14px;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .checklist li.checked .check-box svg { opacity: 1; }
+
+  .btn {
+    width: 100%;
+    max-width: 400px;
+    padding: 16px;
+    border: none;
+    border-radius: 14px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.05em;
+  }
+
+  .btn:active { transform: scale(0.97); }
+
+  .btn-start {
+    background: var(--accent);
+    color: #1a1a2e;
+    margin-top: 8px;
+  }
+
+  .btn-start:disabled {
+    background: #444;
+    color: #777;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .btn-reset {
+    background: transparent;
+    color: var(--text-dim);
+    border: 1px solid #333;
+    margin-top: 12px;
+    font-size: 0.9rem;
+    padding: 12px;
+  }
+
+  .timer-ring-container {
+    position: relative;
+    width: 280px;
+    height: 280px;
+    margin: 20px 0;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.15s;
+  }
+
+  .timer-ring-container.state-running {
+    pointer-events: none;
+  }
+
+  .timer-ring-container svg {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+  }
+
+  .ring-bg {
+    fill: none;
+    stroke: #2a2a4a;
+    stroke-width: 8;
+  }
+
+  .ring-progress {
+    fill: none;
+    stroke-width: 8;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.5s linear, stroke 0.5s;
+  }
+
+  .ring-glow {
+    fill: none;
+    stroke-width: 16;
+    stroke-linecap: round;
+    opacity: 0;
+    filter: blur(8px);
+    transition: opacity 0.3s;
+  }
+
+  .timer-ring-container.state-idle .ring-glow {
+    opacity: 0.3;
+    animation: glowPulse 2s ease-in-out infinite;
+  }
+
+  .timer-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  .timer-phase-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .timer-time {
+    font-size: 3.2rem;
+    font-weight: 200;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+  }
+
+  .timer-sub {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-top: 4px;
+    transition: all 0.3s;
+  }
+
+  .timer-tap-hint {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-top: 8px;
+    padding: 6px 16px;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.08);
+    transition: all 0.3s;
+  }
+
+  .timer-ring-container.state-idle .timer-tap-hint {
+    opacity: 1;
+    animation: hintPulse 2s ease-in-out infinite;
+  }
+
+  .timer-ring-container.state-running .timer-tap-hint,
+  .timer-ring-container.state-done .timer-tap-hint {
+    opacity: 0;
+    height: 0;
+    margin: 0;
+    padding: 0;
+  }
+
+  .phase-steps {
+    display: flex;
+    gap: 0;
+    width: 100%;
+    max-width: 400px;
+    margin: 16px 0;
+  }
+
+  .phase-step {
+    flex: 1;
+    text-align: center;
+    padding: 10px 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-dim);
+    position: relative;
+    transition: color 0.3s;
+  }
+
+  .phase-step::before {
+    content: '';
+    display: block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #333;
+    margin: 0 auto 6px;
+    transition: all 0.3s;
+  }
+
+  .phase-step.active { color: var(--text); }
+  .phase-step.active::before { background: var(--accent); box-shadow: 0 0 12px var(--accent); }
+  .phase-step.done::before { background: var(--success); }
+  .phase-step.done { color: var(--success); }
+
+  .message-bubble {
+    background: var(--card);
+    border-radius: 14px;
+    padding: 16px 20px;
+    width: 100%;
+    text-align: center;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    margin-bottom: 12px;
+    border-left: 3px solid var(--accent);
+    transition: border-color 0.3s;
+  }
+
+  .done-screen {
+    text-align: center;
+    padding: 40px 20px;
+  }
+
+  .done-icon {
+    font-size: 4rem;
+    margin-bottom: 16px;
+  }
+
+  .done-screen h2 {
+    font-size: 1.5rem;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+
+  .done-screen p {
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+
+  .elapsed-total {
+    margin-top: 20px;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+  }
+
+  .elapsed-total span {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  .pulsing { animation: pulse 1.5s ease-in-out infinite; }
+
+  @keyframes glowPulse {
+    0%, 100% { opacity: 0.15; }
+    50% { opacity: 0.4; }
+  }
+
+  @keyframes hintPulse {
+    0%, 100% { opacity: 0.7; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.05); }
+  }
+
+  @keyframes ripple {
+    0% { transform: scale(0.8); opacity: 0.5; }
+    100% { transform: scale(1.4); opacity: 0; }
+  }
+
+  .ripple-effect {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 3px solid var(--accent);
+    animation: ripple 0.6s ease-out forwards;
+    pointer-events: none;
+  }
+
+  .settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .settings-row:last-child { border-bottom: none; }
+
+  .settings-label { font-size: 0.9rem; }
+
+  .settings-label small {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  .settings-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .settings-control button {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid #444;
+    background: transparent;
+    color: var(--text);
+    font-size: 1.1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .settings-control button:active { background: #333; }
+
+  .settings-value {
+    font-size: 1rem;
+    font-weight: 600;
+    min-width: 40px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .settings-unit {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+  }
+
+  .settings-delete {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 1px solid #555;
+    background: transparent;
+    color: #888;
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 8px;
+    transition: all 0.2s;
+  }
+
+  .settings-delete:hover {
+    background: #444;
+    border-color: #666;
+    color: #ccc;
+  }
+
+  .settings-row.disabled {
+    opacity: 0.35;
+  }
+
+  .settings-row.disabled .settings-label {
+    text-decoration: line-through;
+  }
+
+  .settings-row.disabled .settings-delete {
+    opacity: 1;
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+</style>
+</head>
+<body>
+
+<h1>&#x1F35A; <span>飯盒</span>タイマー</h1>
+<p class="subtitle">炊飯の時間管理をシンプルに</p>
+
+<div id="screen-prep" class="screen active">
+  <div class="prep-card">
+    <h2>&#x1F4CB; スタート前の準備</h2>
+    <ul class="checklist" id="checklist">
+      <li data-key="wash">
+        <div class="check-box"><svg viewBox="0 0 24 24" fill="none" stroke="#1a1a2e" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></div>
+        <span>米を研ぐ</span>
+      </li>
+      <li data-key="water">
+        <div class="check-box"><svg viewBox="0 0 24 24" fill="none" stroke="#1a1a2e" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></div>
+        <span>水を入れる（規定量）</span>
+      </li>
+      <li data-key="lid">
+        <div class="check-box"><svg viewBox="0 0 24 24" fill="none" stroke="#1a1a2e" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></div>
+        <span>蓋をしっかりと閉める</span>
+      </li>
+      <li data-key="fire">
+        <div class="check-box"><svg viewBox="0 0 24 24" fill="none" stroke="#1a1a2e" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></div>
+        <span>火を起こしておく</span>
+      </li>
+    </ul>
+  </div>
+
+  <div class="prep-card">
+    <h2>&#x23F1; 時間設定（分）</h2>
+    <div class="settings-row" data-phase="soak">
+      <div class="settings-label">吸水<small>米に水分を吸わせる</small></div>
+      <div class="settings-control">
+        <button onclick="adjustTime('soak', -5)">−</button>
+        <span class="settings-value" id="val-soak">30</span>
+        <span class="settings-unit">分</span>
+        <button onclick="adjustTime('soak', 5)">+</button>
+        <button class="settings-delete" onclick="togglePhase('soak')" title="このステップを無効化">×</button>
+      </div>
+    </div>
+    <div class="settings-row" data-phase="high">
+      <div class="settings-label">強火<small>はじめの加熱</small></div>
+      <div class="settings-control">
+        <button onclick="adjustTime('high', -1)">−</button>
+        <span class="settings-value" id="val-high">5</span>
+        <span class="settings-unit">分</span>
+        <button onclick="adjustTime('high', 1)">+</button>
+        <button class="settings-delete" onclick="togglePhase('high')" title="このステップを無効化">×</button>
+      </div>
+    </div>
+    <div class="settings-row" data-phase="low">
+      <div class="settings-label">弱火<small>じっくり蒸す</small></div>
+      <div class="settings-control">
+        <button onclick="adjustTime('low', -1)">−</button>
+        <span class="settings-value" id="val-low">10</span>
+        <span class="settings-unit">分</span>
+        <button onclick="adjustTime('low', 1)">+</button>
+        <button class="settings-delete" onclick="togglePhase('low')" title="このステップを無効化">×</button>
+      </div>
+    </div>
+    <div class="settings-row" data-phase="steam">
+      <div class="settings-label">蒸らし<small>火を止めてから</small></div>
+      <div class="settings-control">
+        <button onclick="adjustTime('steam', -1)">−</button>
+        <span class="settings-value" id="val-steam">15</span>
+        <span class="settings-unit">分</span>
+        <button onclick="adjustTime('steam', 1)">+</button>
+        <button class="settings-delete" onclick="togglePhase('steam')" title="このステップを無効化">×</button>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn btn-start" id="btn-start" disabled onclick="goToTimer()">スタート</button>
+</div>
+
+<div id="screen-timer" class="screen">
+  <div class="phase-steps" id="phase-steps">
+    <div class="phase-step" data-phase="soak">吸水</div>
+    <div class="phase-step" data-phase="high">強火</div>
+    <div class="phase-step" data-phase="low">弱火</div>
+    <div class="phase-step" data-phase="steam">蒸らし</div>
+  </div>
+
+  <div class="timer-ring-container state-idle" id="timer-ring" onclick="onRingTap()">
+    <svg viewBox="0 0 280 280">
+      <circle class="ring-bg" cx="140" cy="140" r="124"/>
+      <circle class="ring-glow" id="ring-glow" cx="140" cy="140" r="124"
+        stroke-dasharray="779.2" stroke-dashoffset="0"/>
+      <circle class="ring-progress" id="ring-progress" cx="140" cy="140" r="124"
+        stroke-dasharray="779.2" stroke-dashoffset="0"/>
+    </svg>
+    <div class="timer-center">
+      <div class="timer-phase-label" id="timer-phase-label">吸水</div>
+      <div class="timer-time" id="timer-time">30:00</div>
+      <div class="timer-sub" id="timer-sub"></div>
+      <div class="timer-tap-hint" id="timer-tap-hint">タップして開始</div>
+    </div>
+  </div>
+
+  <div class="message-bubble" id="message-bubble"></div>
+
+  <button class="btn btn-reset" onclick="resetTimer()">リセット</button>
+</div>
+
+<div id="screen-done" class="screen">
+  <div class="done-screen">
+    <div class="done-icon">&#x1F35A;</div>
+    <h2>炊き上がり！</h2>
+    <p>蓋を開けて、しゃもじで<br>底から優しく混ぜましょう。</p>
+    <div class="elapsed-total">合計時間: <span id="total-elapsed">--:--</span></div>
+    <button class="btn btn-start" onclick="resetTimer()" style="margin-top: 24px;">もう一度炊く</button>
+  </div>
+</div>
+
+<script>
+  const CIRC = 2 * Math.PI * 124;
+
+  const PHASES = {
+    soak: {
+      label: '吸水', color: 'var(--phase-soak)',
+      msgIdle: '米に水分を吸わせます。<br>準備ができたらタイマーをタップ！',
+      msgRunning: '吸水中です。<br>米にしっかり水分を吸わせましょう。',
+      msgDone: '吸水完了！',
+    },
+    high: {
+      label: '強火', color: 'var(--phase-boil-high)',
+      msgIdle: '強火で加熱します。<br>準備ができたらタイマーをタップ！',
+      msgRunning: '強火で加熱中！<br>沸騰するまで待ちます。',
+      msgDone: '強火完了！',
+    },
+    low: {
+      label: '弱火', color: 'var(--phase-boil-low)',
+      msgIdle: '弱火にします。<br>準備ができたらタイマーをタップ！',
+      msgRunning: '弱火でじーっくり蒸します。',
+      msgDone: '弱火完了！',
+    },
+    steam: {
+      label: '蒸らし', color: 'var(--phase-steam)',
+      msgIdle: '火を止めて蒸らします。<br>準備ができたらタイマーをタップ！',
+      msgRunning: '火を止めました。<br>蓋を開けずに蒸らしましょう。',
+      msgDone: '蒸らし完了！',
+    },
+  };
+
+  const PHASE_ORDER = ['soak', 'high', 'low', 'steam'];
+  let durations = { soak: 5/60, high: 5/60, low: 5/60, steam: 5/60 };
+  let disabledPhases = new Set();
+  let checks = { wash: false, water: false, lid: false, fire: false };
+
+  let currentPhaseIndex = 0;
+  let phaseState = 'idle';
+  let phaseTimeLeft = 0;
+  let phaseDuration = 0;
+  let intervalId = null;
+  let totalStartTime = null;
+
+  const $ = id => document.getElementById(id);
+
+  document.querySelectorAll('.checklist li').forEach(li => {
+    li.addEventListener('click', () => {
+      const key = li.dataset.key;
+      checks[key] = !checks[key];
+      li.classList.toggle('checked', checks[key]);
+      updateStartButton();
+    });
+  });
+
+  function updateStartButton() {
+    $('btn-start').disabled = !Object.values(checks).every(Boolean);
+  }
+
+  function adjustTime(phase, delta) {
+    durations[phase] = Math.max(1, durations[phase] + delta);
+    $('val-' + phase).textContent = durations[phase];
+  }
+
+  function getActivePhases() {
+    return PHASE_ORDER.filter(p => !disabledPhases.has(p));
+  }
+
+  function togglePhase(phase) {
+    const activeCount = getActivePhases().length;
+    if (disabledPhases.has(phase)) {
+      disabledPhases.delete(phase);
+    } else {
+      if (activeCount <= 1) return;
+      disabledPhases.add(phase);
+    }
+    updatePhaseVisibility();
+  }
+
+  function updatePhaseVisibility() {
+    document.querySelectorAll('.settings-row').forEach(row => {
+      const phase = row.dataset.phase;
+      row.classList.toggle('disabled', disabledPhases.has(phase));
+    });
+    document.querySelectorAll('.phase-step').forEach(el => {
+      const phase = el.dataset.phase;
+      el.style.display = disabledPhases.has(phase) ? 'none' : '';
+    });
+  }
+
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    $(id).classList.add('active');
+  }
+
+  function goToTimer() {
+    showScreen('screen-timer');
+    totalStartTime = Date.now();
+    currentPhaseIndex = 0;
+    const activePhases = getActivePhases();
+    showPhaseIdle(activePhases[0]);
+  }
+
+  function showPhaseIdle(phaseKey) {
+    phaseState = 'idle';
+    const phase = PHASES[phaseKey];
+    phaseDuration = durations[phaseKey] * 60;
+    phaseTimeLeft = phaseDuration;
+
+    const ring = $('timer-ring');
+    ring.className = 'timer-ring-container state-idle';
+
+    $('timer-phase-label').textContent = phase.label;
+    $('timer-phase-label').style.color = phase.color;
+    $('timer-time').textContent = formatTime(phaseTimeLeft);
+    $('timer-time').classList.remove('pulsing');
+    $('timer-sub').textContent = phaseDuration / 60 + '分';
+    $('timer-tap-hint').textContent = 'タップして開始';
+    $('message-bubble').innerHTML = phase.msgIdle;
+    $('message-bubble').style.borderLeftColor = phase.color;
+
+    $('ring-progress').style.stroke = phase.color;
+    $('ring-progress').style.strokeDashoffset = CIRC;
+    $('ring-glow').style.stroke = phase.color;
+    $('ring-glow').style.strokeDashoffset = CIRC;
+
+    updatePhaseSteps();
+    clearInterval(intervalId);
+  }
+
+  function activatePhase() {
+    phaseState = 'running';
+    const activePhases = getActivePhases();
+    const phase = PHASES[activePhases[currentPhaseIndex]];
+
+    const ring = $('timer-ring');
+    ring.className = 'timer-ring-container state-running';
+
+    $('timer-tap-hint').textContent = '';
+    $('message-bubble').innerHTML = phase.msgRunning;
+
+    updateDisplay();
+    clearInterval(intervalId);
+    intervalId = setInterval(tick, 250);
+  }
+
+  function onRingTap() {
+    if (phaseState !== 'idle') return;
+    spawnRipple();
+    playClick();
+    activatePhase();
+  }
+
+  function tick() {
+    phaseTimeLeft -= 0.25;
+    if (phaseTimeLeft <= 0) {
+      phaseTimeLeft = 0;
+      updateDisplay();
+      clearInterval(intervalId);
+      phaseComplete();
+      return;
+    }
+    updateDisplay();
+  }
+
+  function phaseComplete() {
+    phaseState = 'done';
+    const ring = $('timer-ring');
+    ring.className = 'timer-ring-container state-done';
+
+    const activePhases = getActivePhases();
+    const phase = PHASES[activePhases[currentPhaseIndex]];
+    $('message-bubble').innerHTML = phase.msgDone;
+    $('timer-time').classList.remove('pulsing');
+
+    playBeep();
+    vibrate();
+
+    setTimeout(() => {
+      currentPhaseIndex++;
+      if (currentPhaseIndex >= activePhases.length) {
+        showDoneScreen();
+      } else {
+        showPhaseIdle(activePhases[currentPhaseIndex]);
+      }
+    }, 3000);
+  }
+
+  function updateDisplay() {
+    $('timer-time').textContent = formatTime(phaseTimeLeft);
+
+    const progress = phaseDuration > 0 ? (phaseDuration - phaseTimeLeft) / phaseDuration : 0;
+    const offset = CIRC * (1 - progress);
+    $('ring-progress').style.strokeDashoffset = offset;
+    $('ring-glow').style.strokeDashoffset = offset;
+
+    if (phaseTimeLeft <= 10 && phaseTimeLeft > 0 && phaseState === 'running') {
+      $('timer-time').classList.add('pulsing');
+    } else {
+      $('timer-time').classList.remove('pulsing');
+    }
+  }
+
+  function updatePhaseSteps() {
+    const activePhases = getActivePhases();
+    document.querySelectorAll('.phase-step').forEach(el => {
+      const idx = activePhases.indexOf(el.dataset.phase);
+      el.classList.remove('active', 'done');
+      if (idx < currentPhaseIndex) el.classList.add('done');
+      else if (idx === currentPhaseIndex) el.classList.add('active');
+    });
+  }
+
+  function showDoneScreen() {
+    const elapsed = Math.round((Date.now() - totalStartTime) / 1000);
+    const m = Math.floor(elapsed / 60);
+    const s = elapsed % 60;
+    $('total-elapsed').textContent = m + '分' + String(s).padStart(2, '0') + '秒';
+
+    document.querySelectorAll('.phase-step').forEach(el => {
+      el.classList.remove('active');
+      el.classList.add('done');
+    });
+
+    playFanfare();
+    vibrate();
+    setTimeout(() => showScreen('screen-done'), 600);
+  }
+
+  function resetTimer() {
+    clearInterval(intervalId);
+    currentPhaseIndex = 0;
+    phaseState = 'idle';
+    phaseTimeLeft = 0;
+    phaseDuration = 0;
+    totalStartTime = null;
+    checks = { wash: false, water: false, lid: false, fire: false };
+    document.querySelectorAll('.checklist li').forEach(li => li.classList.remove('checked'));
+    updateStartButton();
+    
+    disabledPhases.clear();
+    updatePhaseVisibility();
+    
+    showScreen('screen-prep');
+  }
+
+  function formatTime(sec) {
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  }
+
+  function spawnRipple() {
+    const el = document.createElement('div');
+    el.className = 'ripple-effect';
+    const activePhases = getActivePhases();
+    const phase = PHASES[activePhases[currentPhaseIndex]];
+    el.style.borderColor = phase ? phase.color : 'var(--accent)';
+    $('timer-ring').appendChild(el);
+    el.addEventListener('animationend', () => el.remove());
+  }
+
+  function playClick() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 600;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.08);
+    } catch(e) {}
+  }
+
+  function playBeep() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      [0, 0.25, 0.5].forEach(delay => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = 880;
+        osc.type = 'sine';
+        gain.gain.setValueAtTime(0.3, ctx.currentTime + delay);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.2);
+        osc.start(ctx.currentTime + delay);
+        osc.stop(ctx.currentTime + delay + 0.2);
+      });
+    } catch(e) {}
+  }
+
+  function playFanfare() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const notes = [
+        { freq: 523, time: 0 },
+        { freq: 659, time: 0.15 },
+        { freq: 784, time: 0.3 },
+        { freq: 1047, time: 0.5 },
+        { freq: 1047, time: 0.8 },
+        { freq: 1319, time: 1.0 },
+      ];
+      notes.forEach(note => {
+        [0, 0.05].forEach(detune => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.frequency.value = note.freq;
+          osc.type = 'sine';
+          gain.gain.setValueAtTime(0.2, ctx.currentTime + note.time + detune);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + note.time + 0.4);
+          osc.start(ctx.currentTime + note.time + detune);
+          osc.stop(ctx.currentTime + note.time + 0.4);
+        });
+      });
+    } catch(e) {}
+  }
+
+  function vibrate() {
+    if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+  }
+</script>
+</body>
+</html>
