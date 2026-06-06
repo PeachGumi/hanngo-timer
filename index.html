@@ -35,33 +35,6 @@
     touch-action: manipulation;
   }
 
-  @media (max-height: 950px) {
-    body { padding: 8px; }
-    h1 { font-size: 1.2rem; margin: 8px 0 2px; }
-    .subtitle { font-size: 0.7rem; margin-bottom: 8px; }
-    .prep-card { padding: 12px; margin-bottom: 8px; border-radius: 12px; }
-    .prep-card h2 { font-size: 0.85rem; margin-bottom: 8px; }
-    .checklist li { padding: 6px 0; font-size: 0.8rem; gap: 8px; }
-    .check-box { width: 18px; height: 18px; }
-    .check-box svg { width: 12px; height: 12px; }
-    .settings-row { padding: 6px 0; }
-    .settings-label { font-size: 0.8rem; }
-    .settings-label small { font-size: 0.7rem; }
-    .settings-control button { width: 28px; height: 28px; font-size: 1rem; }
-    .settings-value { font-size: 0.9rem; min-width: 32px; }
-    .settings-unit { font-size: 0.7rem; }
-    .settings-delete { width: 24px; height: 24px; font-size: 0.9rem; }
-    .btn { padding: 10px; font-size: 0.95rem; }
-    .timer-ring-container { width: 200px; height: 200px; margin: 8px 0; }
-    .timer-phase-label { font-size: 0.75rem; }
-    .timer-time { font-size: 2.2rem; }
-    .timer-sub { font-size: 0.7rem; }
-    .timer-tap-hint { font-size: 0.75rem; padding: 4px 12px; }
-    .message-bubble { padding: 10px 14px; font-size: 0.8rem; border-radius: 10px; }
-    .phase-step { font-size: 0.65rem; padding: 6px 2px; }
-    .phase-step::before { width: 8px; height: 8px; margin-bottom: 4px; }
-  }
-
   h1 {
     font-size: 1.6rem;
     margin: 20px 0 8px;
@@ -485,6 +458,33 @@
     opacity: 1;
     border-color: var(--accent);
     color: var(--accent);
+  }
+
+  @media (max-height: 950px) {
+    body { padding: 8px; }
+    h1 { font-size: 1.2rem; margin: 8px 0 2px; }
+    .subtitle { font-size: 0.7rem; margin-bottom: 8px; }
+    .prep-card { padding: 12px; margin-bottom: 8px; border-radius: 12px; }
+    .prep-card h2 { font-size: 0.85rem; margin-bottom: 8px; }
+    .checklist li { padding: 6px 0; font-size: 0.8rem; gap: 8px; }
+    .check-box { width: 18px; height: 18px; }
+    .check-box svg { width: 12px; height: 12px; }
+    .settings-row { padding: 6px 0; }
+    .settings-label { font-size: 0.8rem; }
+    .settings-label small { font-size: 0.7rem; }
+    .settings-control button { width: 28px; height: 28px; font-size: 1rem; }
+    .settings-value { font-size: 0.9rem; min-width: 32px; }
+    .settings-unit { font-size: 0.7rem; }
+    .settings-delete { width: 24px; height: 24px; font-size: 0.9rem; }
+    .btn { padding: 10px; font-size: 0.95rem; }
+    .timer-ring-container { width: 200px; height: 200px; margin: 8px 0; }
+    .timer-phase-label { font-size: 0.75rem; }
+    .timer-time { font-size: 2.2rem; }
+    .timer-sub { font-size: 0.7rem; }
+    .timer-tap-hint { font-size: 0.75rem; padding: 4px 12px; }
+    .message-bubble { padding: 10px 14px; font-size: 0.8rem; border-radius: 10px; }
+    .phase-step { font-size: 0.65rem; padding: 6px 2px; }
+    .phase-step::before { width: 8px; height: 8px; margin-bottom: 4px; }
   }
 </style>
 </head>
@@ -970,6 +970,6 @@
     if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
   }
 </script>
-<div class="version">v1.0.4</div>
+<div class="version">v1.0.5</div>
 </body>
 </html>
