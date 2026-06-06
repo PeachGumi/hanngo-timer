@@ -485,10 +485,10 @@
     <div class="settings-row" data-phase="soak">
       <div class="settings-label">吸水<small>米に水分を吸わせる</small></div>
       <div class="settings-control">
-        <button onclick="adjustTime('soak', -1)">−</button>
+        <button onclick="adjustTime('soak', -5)">−</button>
         <span class="settings-value" id="val-soak">30</span>
         <span class="settings-unit">分</span>
-        <button onclick="adjustTime('soak', 1)">+</button>
+        <button onclick="adjustTime('soak', 5)">+</button>
         <button class="settings-delete" onclick="togglePhase('soak')" title="このステップを無効化">×</button>
       </div>
     </div>
@@ -624,7 +624,11 @@
   }
 
   function adjustTime(phase, delta) {
-    durations[phase] = Math.max(1, durations[phase] + delta);
+    if (phase === 'soak' && durations[phase] === 1 && delta > 0) {
+      durations[phase] = 5;
+    } else {
+      durations[phase] = Math.max(1, durations[phase] + delta);
+    }
     $('val-' + phase).textContent = durations[phase];
   }
 
