@@ -642,9 +642,21 @@
   let phaseTimeLeft = 0;
   let phaseDuration = 0;
   let intervalId = null;
+  let transitionTimeoutId = null;
   let totalStartTime = null;
   let phaseStartTime = null;
   let notificationPermission = 'default';
+  let audioCtx = null;
+
+  function getAudioContext() {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+    return audioCtx;
+  }
 
   const $ = id => document.getElementById(id);
 
@@ -660,7 +672,7 @@
     if (document.hidden && notificationPermission === 'granted') {
       const notification = new Notification(title, {
         body: body,
-        icon: '🍚',
+        icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="80" font-size="80">🍚</text></svg>',
         tag: 'hanngo-timer',
         requireInteraction: true
       });
@@ -686,11 +698,7 @@
   }
 
   function adjustTime(phase, delta) {
-    if (phase === 'soak' && durations[phase] === 1 && delta > 0) {
-      durations[phase] = 5;
-    } else {
-      durations[phase] = Math.max(1, durations[phase] + delta);
-    }
+    durations[phase] = Math.max(1, durations[phase] + delta);
     $('val-' + phase).textContent = durations[phase];
   }
 
@@ -818,7 +826,7 @@
     playBeep();
     vibrate();
 
-    setTimeout(() => {
+    transitionTimeoutId = setTimeout(() => {
       currentPhaseIndex++;
       if (currentPhaseIndex >= activePhases.length) {
         showDoneScreen();
@@ -872,6 +880,7 @@
 
   function resetTimer() {
     clearInterval(intervalId);
+    clearTimeout(transitionTimeoutId);
     currentPhaseIndex = 0;
     phaseState = 'idle';
     phaseTimeLeft = 0;
@@ -906,7 +915,7 @@
 
   function playClick() {
     try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = getAudioContext();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.connect(gain);
@@ -922,7 +931,7 @@
 
   function playBeep() {
     try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = getAudioContext();
       [0, 0.25, 0.5].forEach(delay => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
@@ -940,7 +949,7 @@
 
   function playFanfare() {
     try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = getAudioContext();
       const notes = [
         { freq: 523, time: 0 },
         { freq: 659, time: 0.15 },
@@ -970,6 +979,6 @@
     if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
   }
 </script>
-<div class="version">v1.0.7</div>
+<div class="version">v1.0.8</div>
 </body>
 </html>
