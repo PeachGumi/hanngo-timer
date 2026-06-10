@@ -698,7 +698,8 @@
   }
 
   function adjustTime(phase, delta) {
-    durations[phase] = Math.max(1, durations[phase] + delta);
+    const min = phase === 'soak' ? 5 : 1;
+    durations[phase] = Math.max(min, durations[phase] + delta);
     $('val-' + phase).textContent = durations[phase];
   }
 
