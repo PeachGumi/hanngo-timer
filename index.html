@@ -497,19 +497,19 @@
   <div class="prep-card">
     <h2>&#x1F4CB; スタート前の準備</h2>
     <ul class="checklist" id="checklist">
-      <li data-key="wash">
+      <li data-key="wash" tabindex="0" role="checkbox" aria-checked="false">
         <div class="check-box"><svg viewBox="0 0 24 24" fill="none" stroke="#1a1a2e" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></div>
         <span>米を研ぐ</span>
       </li>
-      <li data-key="water">
+      <li data-key="water" tabindex="0" role="checkbox" aria-checked="false">
         <div class="check-box"><svg viewBox="0 0 24 24" fill="none" stroke="#1a1a2e" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></div>
         <span>水を入れる（規定量）</span>
       </li>
-      <li data-key="lid">
+      <li data-key="lid" tabindex="0" role="checkbox" aria-checked="false">
         <div class="check-box"><svg viewBox="0 0 24 24" fill="none" stroke="#1a1a2e" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></div>
         <span>蓋をしっかりと閉める</span>
       </li>
-      <li data-key="fire">
+      <li data-key="fire" tabindex="0" role="checkbox" aria-checked="false">
         <div class="check-box"><svg viewBox="0 0 24 24" fill="none" stroke="#1a1a2e" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></div>
         <span>火を起こしておく</span>
       </li>
@@ -571,13 +571,11 @@
     <div class="phase-step" data-phase="steam">蒸らし</div>
   </div>
 
-  <div class="timer-ring-container state-idle" id="timer-ring" onclick="onRingTap()">
+  <div class="timer-ring-container state-idle" id="timer-ring" tabindex="0" role="button" aria-label="タイマーを開始" onclick="onRingTap()">
     <svg viewBox="0 0 280 280">
       <circle class="ring-bg" cx="140" cy="140" r="124"/>
-      <circle class="ring-glow" id="ring-glow" cx="140" cy="140" r="124"
-        stroke-dasharray="779.2" stroke-dashoffset="0"/>
-      <circle class="ring-progress" id="ring-progress" cx="140" cy="140" r="124"
-        stroke-dasharray="779.2" stroke-dashoffset="0"/>
+      <circle class="ring-glow" id="ring-glow" cx="140" cy="140" r="124"/>
+      <circle class="ring-progress" id="ring-progress" cx="140" cy="140" r="124"/>
     </svg>
     <div class="timer-center">
       <div class="timer-phase-label" id="timer-phase-label">吸水</div>
@@ -604,6 +602,8 @@
 
 <script>
   const CIRC = 2 * Math.PI * 124;
+  document.getElementById('ring-glow').setAttribute('stroke-dasharray', CIRC);
+  document.getElementById('ring-progress').setAttribute('stroke-dasharray', CIRC);
 
   const PHASES = {
     soak: {
@@ -637,6 +637,29 @@
   let disabledPhases = new Set();
   let checks = { wash: false, water: false, lid: false, fire: false };
 
+  const STORAGE_KEY = 'hanngo-timer-settings';
+
+  function loadSettings() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      if (saved) {
+        if (saved.durations) Object.assign(durations, saved.durations);
+        if (saved.disabledPhases) saved.disabledPhases.forEach(p => disabledPhases.add(p));
+      }
+    } catch (e) {}
+  }
+
+  function saveSettings() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        durations,
+        disabledPhases: [...disabledPhases],
+      }));
+    } catch (e) {}
+  }
+
+  loadSettings();
+
   let currentPhaseIndex = 0;
   let phaseState = 'idle';
   let phaseTimeLeft = 0;
@@ -659,6 +682,12 @@
   }
 
   const $ = id => document.getElementById(id);
+
+  Object.keys(durations).forEach(phase => {
+    const el = $('val-' + phase);
+    if (el) el.textContent = durations[phase];
+  });
+  updatePhaseVisibility();
 
   async function requestNotificationPermission() {
     if ('Notification' in window && Notification.permission === 'default') {
@@ -689,7 +718,14 @@
       const key = li.dataset.key;
       checks[key] = !checks[key];
       li.classList.toggle('checked', checks[key]);
+      li.setAttribute('aria-checked', checks[key]);
       updateStartButton();
+    });
+    li.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        li.click();
+      }
     });
   });
 
@@ -701,6 +737,7 @@
     const min = phase === 'soak' ? 5 : 1;
     durations[phase] = Math.max(min, durations[phase] + delta);
     $('val-' + phase).textContent = durations[phase];
+    saveSettings();
   }
 
   function getActivePhases() {
@@ -716,6 +753,7 @@
       disabledPhases.add(phase);
     }
     updatePhaseVisibility();
+    saveSettings();
   }
 
   function updatePhaseVisibility() {
@@ -793,6 +831,13 @@
     playClick();
     activatePhase();
   }
+
+  $('timer-ring').addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onRingTap();
+    }
+  });
 
   function tick() {
     const elapsed = (Date.now() - phaseStartTime) / 1000;
@@ -889,11 +934,20 @@
     totalStartTime = null;
     phaseStartTime = null;
     checks = { wash: false, water: false, lid: false, fire: false };
-    document.querySelectorAll('.checklist li').forEach(li => li.classList.remove('checked'));
+    document.querySelectorAll('.checklist li').forEach(li => {
+      li.classList.remove('checked');
+      li.setAttribute('aria-checked', 'false');
+    });
     updateStartButton();
     
+    durations = { soak: 30, high: 5, low: 10, steam: 15 };
     disabledPhases.clear();
+    Object.keys(durations).forEach(phase => {
+      const el = $('val-' + phase);
+      if (el) el.textContent = durations[phase];
+    });
     updatePhaseVisibility();
+    saveSettings();
     
     showScreen('screen-prep');
   }
